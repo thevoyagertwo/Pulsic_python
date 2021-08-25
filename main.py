@@ -5,6 +5,12 @@
 # or my manually inputting values
 #
 
+# Possible optimisations:
+# Make so ray cast from point being tested is in optimal direction by inferring which direction would have least intersections
+#
+#
+
+
 
 
 import numpy as np
@@ -54,7 +60,7 @@ def data_extract(filename):
 
 
 
-
+## moved this to method above so should be good to delete
     # below works for getting outline data but working on a smarter system above that will check the string to make sure outline is correct
     #
     # temp_row = raw_data[0].split(" ") # Splits 'Outline NO_outline' where NO_outline is number of points in Outline
@@ -72,41 +78,49 @@ def data_extract(filename):
     #         outline_data[NO_outline, 1] = int(temp_row[1])
 
 
-    # full_data(0,0) = 10
-
-
-    # for row in file:
-    #     file_data = row.split(" ")
-    #
-    #
-    #     print(file_data[0])
-    #     print(file_data[1])
-
     file.close()
 
 
     return output_data
 
-
+def line_eq(px1,py1,px2,py2) :
+    m = (py1-py2)/(px1-px2)
+    c = py1-m*px1
+    return m , c
 
 
 if __name__ == '__main__':
 
+    ## <main.py> <text file> <x> <y>
+    # filename = sys.argv[1]
+    # x_point = int(sys.argv[2])
+    # y_point = int(sys.argv[3])
+
     ## uncomment for manual input
-    # filename = 'data.txt'
-    # x_point = 250
-    # y_point = 500
+    filename = 'data.txt'
+    x_point = 250
+    y_point = 500
 
-
-    # <main.py> <text file> <x> <y>
-    filename = sys.argv[1]
-    x_point = int(sys.argv[2])
-    y_point = int(sys.argv[3])
-
-    print(sys.argv[1])
 
     file_data = data_extract(filename)
     print(file_data)
+    k = 1
+    m = line_eq(file_data[k,0] , file_data[k,1] , file_data[k+1,0] , file_data[k+1,1] )
+    print(m)
+    print(file_data[0,:])
+
+
+
+
+
+# Using to find if point line intersects poly line. Takes two np.arrays((2,2)) for the x,y  of start and end of the lines where [1,:] is the x data
+# assuming point line is in + x axis. Could be some optimisations by inferring which directing has least tests
+# def intersection(lx1,ly1,lx2,ly2,px1,py1,px2,py2):
+#     if ()
+#
+#
+#
+#     return intersecting
 
 
 

@@ -1,0 +1,11 @@
+
+https://www.desmos.com/calculator/mhq4hsncnh
+
+
+really easy to work if lines intersect if point and the end point are left and right of the line
+
+
+nuance when point is between polygon coords
+
+
+could work out line equation and
