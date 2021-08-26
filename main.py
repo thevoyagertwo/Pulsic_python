@@ -7,9 +7,9 @@
 
 # Possible optimisations:
 # Make so ray cast from point being tested is in optimal direction by inferring which direction would have least possible intersections
-#
-#
-
+# Can check first if it is outside outline, if so answer is known
+# If within outline check cut outs one at a time, if within a cut out end program
+# once all cut outs checked we know for certain it is within outline and not inside a cut out
 
 
 
@@ -89,36 +89,59 @@ def line_eq(px1,py1,px2,py2) : # need a check to see if gradient is +- inf
     c = py1-m*px1
     return m , c
 
-def point_in_poly(filename,lx1,ly1):
+def point_in_poly(filename,lx,ly): # lx,ly are point coordinates. Line(ray) drawn to infinity in +x direction
     intersection_count = 0 # counter used for number of intersections from point ray cast
     row_count = 0 # used to keep track of what rows of the text file has been extracted
 
     file_data = data_extract(filename,row_count)
     print(file_data)
 
+    for i in range(len(file_data) - 1): # -1 range as first points coordinates are stored in 0th and ith row
+        # storing
+        px1 = file_data[i,0]
+        py1 = file_data[i,1]
+        px2 = file_data[i+1,0]
+        py2 = file_data[i+1,1]
+        print(px1,py1,px2,py2, lx, ly)
+
+        # rules so point ray is within y bounds of polygon line
+        y_bounds = ly > min(py1, py2) and ly <= max(py1, py2)
+        # rules to check if point is left of both polygon line points. As if within there is some nuance to if ray is intersecting
+        x_left_bounds = lx < min(px1, px2)
+
+        if y_bounds: # checks if point is not above/below polygon line
+            print('ybounds',str(i))
+            if x_left_bounds:  # checks if point is left(-ve x direction) of both polygon line points
+                intersection_count = intersection_count  + 1 # intersection between point ray and polygon line
+                print('xbounds',str(i))
+
     if (intersection_count % 2 ) == 0 : # checks if number of intersections is even
-        in_poly = 'within' # if even point is point is outside polygon
+        in_poly = 'outside' # if even point is point is outside polygon
     else:
-        in_poly = 'outside'  # if odd point is point is inside polygon
+        in_poly = 'within'  # if odd point is point is inside polygon
+
+    print('Point ray had ' + str(intersection_count) + ' intersections')
+
+
     return in_poly
 
 if __name__ == '__main__':
     ## <main.py> <text file> <x> <y>
     try:
         filename = sys.argv[1]
-        lx1 = int(sys.argv[2]) # x point coordinate
-        ly1 = int(sys.argv[3]) # y point coordinate
+        lx = int(sys.argv[2]) # x point coordinate
+        ly = int(sys.argv[3]) # y point coordinate
 
     except:
     ## uncomment for manual input
         filename = 'data.txt'
-        lx1 = 250 # x point coordinate
-        ly1 = 500 # y point coordinate
+        lx = 5000# x point coordinate
+        ly = 7000 # y point coordinate
         print('cmd line inputs not read successfully, using defaults which can be changed within file')
 
-    in_poly = point_in_poly(filename, lx1, ly1)
+    in_poly = point_in_poly(filename, lx, ly)
 
-    print('Point (' + str(lx1) + ',' + str(ly1) + ')' + ' found to be ' + in_poly +' polygon described in: ' + filename )
+    print('Point (' + str(lx) + ',' + str(ly) + ')' + ' found to be ' + in_poly +' polygon described in: ' + filename )
 
 
     # # to test data_extract and grad
@@ -134,7 +157,7 @@ if __name__ == '__main__':
 
 # Using to find if point line intersects poly line. Takes two np.arrays((2,2)) for the x,y  of start and end of the lines where [1,:] is the x data
 # assuming point line is in + x axis. Could be some optimisations by inferring which directing has least tests
-# def intersection(lx1,ly1,lx2,ly2,px1,py1,px2,py2):
+# def intersection(lx,ly,px1,py1,px2,py2):
 #     if ()
 #
 #
