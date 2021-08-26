@@ -1,0 +1,273 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!! module load openmpi
+
+program qb
+use mpi
+implicit none
+
+real,allocatable,dimension(:,:) :: p , q ! phi and charge size determined by h and a,b 
+integer :: x , y , k = 0 ,maxruns , nx , ny , NOdatapoints
+integer,dimension(1:2) :: arraySE !arrayStartEnd  used to store start and end values  stored in each proccesor x.e. the row index stored
+real :: w , eps , h , a , b , p_new
+
+!https://www.google.com/search?q=how+fortran+stores+matrices&client=ubuntu&hs=VuH&channel=fs&sxsrf=ACYBGNTSMIJ1hNJU0aJ-jeMRRo8U2lWMBA:1575722180192&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiCn8LGxqPmAhXhoXEKHYsbAAoQ_AUoAXoECA0QAw&biw=892&bih=746#imgrc=WMc9MY_2Ow3QDM
+
+!grayscale variables:
+real :: tmin, tmax
+integer :: out_unit , max_greys 
+integer,allocatable,dimension(:,:) :: pixels
+
+!MPI based variables
+integer :: my_data, status(1:MPI_STATUS_SIZE)
+integer :: ierror,myrank,numprocs
+integer,dimension(4):: request  ! total of 4 sends + requests
+integer, parameter :: dp=selected_real_kind(15,300)
+real(kind=dp) :: start, finish !MPI timings
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!! initialise MPI world !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+call MPI_init(ierror)
+if (ierror/=MPI_success) stop 'Error in MPI_init'
+
+!get size (total number of processors) within MPI world
+call MPI_comm_size(MPI_comm_world,numprocs,ierror)
+if (ierror/=MPI_success) stop 'Error in MPI_comm_size'
+
+!get my rank on each different processor within MPI world (0 to num_procs-1)
+call MPI_comm_rank(MPI_comm_world,myrank,ierror)
+if (ierror/=MPI_success) stop 'Error in MPI_comm_rank'
+
+!if (numprocs ==3) stop 'input 1,2,4,5,10 processors only'
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!! Variables to be set !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+eps = 1.  	  	 ! permitivitiy of free space normalized to 1
+w = 1.9  		 ! free parameter between 1 and 2 which controls rate of convergence
+maxruns = 1000   ! max runs
+a = 4   		 ! length in x axis
+b = 6   		 ! length in y axis
+h = .01 		 ! grid size (discretise axb grid into hxh size pieces)
+nx = int(a/h)
+ny = int(b/h)
+print*,nx,ny,'nx,ny'
+
+! allocate matricies to the size required for hxh boxes in a axb box
+allocate(p(0:ny,0:nx),q(0:ny,0:nx),stat=ierror) ! careful its  (y,x)
+if (ierror/=0) stop 'error in allocating p , q'
+
+!particle locations and charge divide coordinate by h for correct array p(y,x)=p(y/h,x/h)
+p = 0 ; q = 0 ! set arrays to 0
+q(int(2.5/h)   ,int(2.5/h)) = 1. !charge 1 
+q(int(1/h  )   ,int(3/h  )) = 1. !charge 2
+q(int(5.5/h  )   ,int(2/h  )) = 1. !charge 3
+q(int(5.5/h  )   ,int(3.9/h  )) = 1. !charge 4
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!Fortran stores arrays columns first x.e c(1,1) c(2,1) , c(3,1) .. c(m,1) , c(1,2) , c(2,2) etc
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!splitting data accross proccessors to initialise Rounds down and up for start and end (as can not start half way through a column)
+!arraySE(1) = int(floor  (1.*nx/numprocs))*(myrank)     ! columns that each proccessor has  
+!arraySE(2) = int(floor  (1.*nx/numprocs))*(myrank+1)   ! arrayStartEnd
+arraySE(1) = nx/numprocs*(myrank)     ! columns that each proccessor has  
+arraySE(2) = nx/numprocs*(myrank+1)   ! arrayStartEnd
+print*,arraySE,myrank,floor(1.*nx/numprocs*(myrank)),ceiling(1.*nx/numprocs*(myrank+1))
+
+!timing start
+start= MPI_WTIME()
+!timing start
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SERIAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+if (numprocs ==1) then
+	do while (k<maxruns)
+		do y = 1,ny-1
+			do x = 1,nx-1
+				call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+			end do
+		end do
+		k = k + 1
+	end do
+else
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Parallel !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!two options
+!allocating proccessor arrays only to the size required (0 to +1 as require data from other array/itll be a heatbath) 
+!allocate (tp(0:nx+1,arraySE(1)-1:arraySE(2)+1) ,tpold(0:nx+1,arraySE(1)-1:arraySE(2)+1))
+!or have full size matrix for all proccesors (less data efficient but easier to inforce heat/cooling points)
+
+NOdatapoints = ny ! number of data points sent(ydirection) 0 1 2....... 100   ->101 dont need this one as just 0
+	k=0
+	do while (k<maxruns)
+		if (myrank == 0) then             
+			call MPI_ISEND(p(1,arraySE(2))     ,NOdatapoints,MPI_REAL,1,111,MPI_comm_world,request(1),ierror)
+		  	call MPI_Irecv(p(1,arraySE(2)+1)   ,NOdatapoints,MPI_REAL,1,111,MPI_comm_world,request(2),ierror)
+		  	!print*,'sends data'
+			
+			do x = 1,arraySE(2)-1
+				do y =  1,ny-1 
+		            call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+				end do
+			end do	
+
+	        !print*,'does calcs before latency hiding'
+	
+			call MPI_WAIT(request(2), STATUS, IERROR) ! waiting for data for column arraySE(2)+1 so calculations of x=arraySE(2) can be performed
+            
+            x = arraySE(2)
+			do y = 1,ny-1  
+		        call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+			end do
+
+			call MPI_WAIT(request(1), STATUS, IERROR) ! do not need to wait for data to send before calculating any new values as data is send to buffer
+			
+		elseif (myrank /= numprocs-1 .and. myrank /= 0)  then  !procs that arent first or last as they need to send/recv behind from myrank+1/-1
+			call MPI_ISEND(p(1,arraySE(1)+1)     ,NOdatapoints,MPI_REAL,myrank-1,111,MPI_comm_world,request(1),ierror)
+		  	call MPI_Irecv(p(1,arraySE(1))       ,NOdatapoints,MPI_REAL,myrank-1,111,MPI_comm_world,request(2),ierror)
+		  	
+		  	!send/recieve ahead
+			call MPI_ISEND(p(1,arraySE(2))     ,NOdatapoints,MPI_REAL,myrank+1,111,MPI_comm_world,request(3),ierror)
+		  	call MPI_Irecv(p(1,arraySE(2)+1)   ,NOdatapoints,MPI_REAL,myrank+1,111,MPI_comm_world,request(4),ierror)
+		  	
+			call MPI_WAIT(request(4), STATUS, IERROR)
+					         
+			do x = arraySE(1)+2,arraySE(2)
+				do y =  1,ny - 1 
+					call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+				end do
+			end do
+			
+			call MPI_WAIT(request(2), STATUS, IERROR)
+			
+			x = arraySE(1)+1
+			do y = 1,ny - 1  
+				call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+			end do
+			
+			call MPI_WAIT(request(1), STATUS, IERROR)! do not need to wait for data to send before calculating any new values as data is send to buffer
+			call MPI_WAIT(request(3), STATUS, IERROR)! do not need to wait for data to send before calculating any new values as data is send to buffer
+			
+		elseif (myrank == numprocs-1 .and. numprocs>2) then  !special case for last processor as need to miss last col and no message to ahead
+			call MPI_ISEND(p(1,arraySE(1)+1)     ,NOdatapoints,MPI_REAL,myrank-1,111,MPI_comm_world,request(3),ierror)
+		    call MPI_Irecv(p(1,arraySE(1))       ,NOdatapoints,MPI_REAL,myrank-1,111,MPI_comm_world,request(4),ierror)
+
+			call MPI_WAIT(request(4), STATUS, IERROR)
+		         
+			do x = arraySE(1)+1,arraySE(2)
+				do y = 1,ny - 1
+					call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+				end do
+			end do
+			
+			call MPI_WAIT(request(3), STATUS, IERROR)! do not need to wait for data to send before calculating any new values as data is send to buffer
+			
+		elseif (myrank == numprocs-1 .and. numprocs==2) then  !special case for last processor(2 proccessors only) as need to miss last col and no message to ahead
+			!No latency hiding can be used here as this method updated p as it goes so first column x=arraySE(1) is required before calculations can take place
+		  	call MPI_ISEND(p(1,arraySE(1)+1)     ,NOdatapoints,MPI_REAL,0,111,MPI_comm_world,request(1),ierror)
+		  	call MPI_Irecv(p(1,arraySE(1))       ,NOdatapoints,MPI_REAL,0,111,MPI_comm_world,request(2),ierror)
+
+			call MPI_WAIT(request(1), STATUS, IERROR)
+			call MPI_WAIT(request(2), STATUS, IERROR)
+		         
+			do x = arraySE(1)+1,arraySE(2)  
+				do y = 1,ny - 1
+					call pot(q(y,x),p(y,x),p(y,x-1),p(y,x+1),p(y-1,x),p(y+1,x),w,eps,p(y,x)) !calculates new potential and updates current potential immediately
+				end do
+			end do
+			
+		end if
+		k = k+1
+	end do
+end if
+
+if (numprocs > 1) then ! zeros out q so p values on all threads can be reduced to thread 0 (collating data)
+		q=0 ! use q as a temp to colate data to
+		call MPI_REDUCE(p,q,(ny+1)*(nx+1),MPI_REAL,MPI_MAX,0,MPI_comm_world,ierror)
+		p = q
+end if
+if (myrank==0) then
+ print*,p(int(2.5/h),0:nx)
+ end if
+!timing end
+finish = MPI_WTIME()
+!timing end
+print*,'gets to before printing to pgm'
+call MPI_FINALIZE(IERROR)
+if (ierror/=MPI_success) stop 'Error in finalization'
+  
+if (myrank==0) then ! using only thread 0 to write to pixels and .pgm file as data has been reduced to this thread
+	  !set up the pgmfile for viewing
+	  allocate(pixels(1:nx,1:ny),stat=ierror)
+	  if (ierror/=0) stop 'Error in allocating pixels'
+
+	  max_greys=255
+	  Tmax=maxval(p)
+	  Tmin=minval(p)
+	  !print*,t(55,55),'value at (5.5,5.5) time taken = ', finish - start, ' with numprocs = ',numprocs
+	  do y=1,ny
+		 do x=1,nx
+			pixels(x,y)=int((p(y,x)-Tmin)*max_greys/(Tmax-Tmin)) !Tmin<T<Tmax
+		 end do
+	  end do
+
+	  out_unit=10
+	  open(file='potential2d.pgm',unit=out_unit,status='unknown')
+	  write (out_unit,11) 'P2'                 !pgm magic number
+	  write (out_unit,12) nx,ny                !width, height
+	  write (out_unit,13) max_greys            !max gray value
+	  do y=1,Ny
+		 do x=1,Nx-15,15
+			write (out_unit,14) (pixels(x+k-1,y),k=1,15)  !each line < 70 chars
+		 end do
+		 write (out_unit,14) (pixels(k,y),k=x,Nx)
+	  end do
+	  close (unit=out_unit)
+
+	11 format(a2)
+	12 format(i10,1x,i10)
+	13 format(i10)
+	14 format (15(1x,i3))
+	
+	deallocate(pixels,stat=ierror)
+	if (ierror/=0) stop 'error in deallocating p, q, pixels'
+end if
+
+
+
+deallocate(p,q,stat=ierror)
+if (ierror/=0) stop 'error in deallocating p, q, pixels'
+
+
+end program qb
+
+!calculates new potential using discretised Possions equation
+subroutine      pot(q11,p11,p10,p12,p01,p21,w,eps,pout) !p11 and pout will be the same variable as potential is updated immediately
+real,intent(in)  :: q11,p11,p10,p12,p01,p21,w,eps
+real,intent(out) ::                               pout
+real :: u
+	!u = 1/4 (phi(x,y-1)+phi(x,y+1)+phi(x-1,y)+phi(x+1,y) + h^2/h^2*q(1,1)/epsilon)
+	u = .25* (p10       +p12       +p01       +p21                 +q11/eps)
+	      
+	!new_phi = phi_old + w(u-phi_old)
+	pout     = p11     + w*(u-p11)
+	!print*,pout,p11,w,u
+
+end subroutine pot
+
+! To do : 
+!1. make program work for procs = 3,6 etc
+!2. calculations required for the question 
+
+
+!dont think x can do the latency hiding method as the potential is updated immediately so not doing the first row would effect the calculation.
+! x can do it with the last line of recv but not the first line
+! latency hiding does work but not for all send/recvs could give the thread that has full latency hiding more calculations? find how many to do by calculating time for calculations vs latency
+
+
+! problems with arraySE(2)and +1 that for thread 0   - fixed by doing MPI_MAX reduction
+
