@@ -127,8 +127,8 @@ if __name__ == '__main__':
     except:
         ## manual input:
         filename = 'data.txt'
-        lx = 25000  # x point coordinate
-        ly = 4000  # y point coordinate
+        lx = 3200   # x point coordinate
+        ly = 15000  # y point coordinate
         print('cmd line inputs not read successfully, using defaults which can be changed within file')
 
     in_poly = point_in_poly(filename, lx, ly)
