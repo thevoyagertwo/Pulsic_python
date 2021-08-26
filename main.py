@@ -89,31 +89,53 @@ def line_eq(px1,py1,px2,py2) : # need a check to see if gradient is +- inf
     c = py1-m*px1
     return m , c
 
-def point_in_poly(filename,lx,ly): # lx,ly are point coordinates. Line(ray) drawn to infinity in +x direction
+    # special case where between y bounds and x bounds of polygon line
+    # shouldn't have any /0 issues as vertical lines should not lead to a mid_intersection
+  def mid_intersection(lx,ly,px1,py1,px2,py2,accuracy):
+        m,c = line_eq(px1,py1,px2,py2) # finds line of the equation
+
+
+
+        return px1,py1,px2,py2
+
+
+def point_in_poly(filename,lx,ly,accuracy): # lx,ly are point coordinates. Line(ray) drawn to infinity in +x direction
     intersection_count = 0 # counter used for number of intersections from point ray cast
     row_count = 0 # used to keep track of what rows of the text file has been extracted
 
     file_data = data_extract(filename,row_count)
     print(file_data)
 
+
     for i in range(len(file_data) - 1): # -1 range as first points coordinates are stored in 0th and ith row
-        # storing
+        intersection = None # used to see if intersection is made
+        # storing coordinate data
         px1 = file_data[i,0]
         py1 = file_data[i,1]
         px2 = file_data[i+1,0]
         py2 = file_data[i+1,1]
-        print(px1,py1,px2,py2, lx, ly)
+        print(i,px1,py1,px2,py2, lx, ly)
 
         # rules so point ray is within y bounds of polygon line
         y_bounds = ly > min(py1, py2) and ly <= max(py1, py2)
-        # rules to check if point is left of both polygon line points. As if within there is some nuance to if ray is intersecting
-        x_left_bounds = lx < min(px1, px2)
+        x_right_bounds = lx > max(px1, px2) # checks if point is right of both polygon line points if so 100% no intersection
+        x_left_bounds = lx <= min(px1, px2) and intersection != False  # check if point is left of both polygon line points.
 
         if y_bounds: # checks if point is not above/below polygon line
             print('ybounds',str(i))
+            if x_right_bounds:
+                intersection = False
             if x_left_bounds:  # checks if point is left(-ve x direction) of both polygon line points
-                intersection_count = intersection_count  + 1 # intersection between point ray and polygon line
+                intersection = True
                 print('xbounds',str(i))
+            if intersection is None: # special case where between y bounds and x bounds of polygon line
+                px1,py1,px2,py2 = mid_intersection(lx,ly,px1,py1,px2,py2,accuracy)
+
+
+
+        if intersection: # if intersection is True we add onto the counter
+            intersection_count = intersection_count + 1  # intersection between point ray and polygon line
+
 
     if (intersection_count % 2 ) == 0 : # checks if number of intersections is even
         in_poly = 'outside' # if even point is point is outside polygon
@@ -133,13 +155,19 @@ if __name__ == '__main__':
         ly = int(sys.argv[3]) # y point coordinate
 
     except:
-    ## uncomment for manual input
+    ## manual input:
         filename = 'data.txt'
-        lx = 5000# x point coordinate
+        lx = 25000 # x point coordinate
         ly = 7000 # y point coordinate
         print('cmd line inputs not read successfully, using defaults which can be changed within file')
 
-    in_poly = point_in_poly(filename, lx, ly)
+    ## The way I have dealt with the case where the point is within the x,y bounds of the polygon line
+    ## requires drawing the line +- accuracy around x point value.
+    ## Lower accuracy value means better accuracy
+    accuracy = 1
+
+    in_poly = point_in_poly(filename, lx, ly,accuracy)
+
 
     print('Point (' + str(lx) + ',' + str(ly) + ')' + ' found to be ' + in_poly +' polygon described in: ' + filename )
 
@@ -155,18 +183,7 @@ if __name__ == '__main__':
 
 
 
-# Using to find if point line intersects poly line. Takes two np.arrays((2,2)) for the x,y  of start and end of the lines where [1,:] is the x data
-# assuming point line is in + x axis. Could be some optimisations by inferring which directing has least tests
-# def intersection(lx,ly,px1,py1,px2,py2):
-#     if ()
-#
-#
-#
-#     return intersecting
 
 
 
 
-
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
