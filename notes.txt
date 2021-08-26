@@ -12,3 +12,7 @@ could work out line equation and
 
 
 https://www.desmos.com/calculator/wxty2xhyou
+
+
+complete system:
+https://www.desmos.com/calculator/wuhe1o2qsh
