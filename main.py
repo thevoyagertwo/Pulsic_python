@@ -6,7 +6,7 @@
 #
 
 # Possible optimisations:
-# Make so ray cast from point being tested is in optimal direction by inferring which direction would have least intersections
+# Make so ray cast from point being tested is in optimal direction by inferring which direction would have least possible intersections
 #
 #
 
@@ -20,15 +20,16 @@ import sys
 
 
 
-def data_extract(filename):
+def data_extract(filename,i):  # i used to keep count of what row is being searched so this can be called multiple times
+                               # till outline and all cuts have been saved
+                               # Can change while to be < temp_row[1] from temp_row = raw_data[i].split(" ")
 
-    #Opens file to be read and splits into a list of each line content. example below
+    #Opens file to be read and splits into a list of each line content. example format below
     file = open(filename, "r")
     # raw_data form: ['OUTLINE 8', '2100 19640', '29255 19640', '29255 1125', '20450 1125', '20450 8345', ..]
     raw_data = file.read().splitlines()
 
-    i = 0 # used to keep count of what row is being searched
-    cut_count = 0 # counts number of cuts in the file
+
     while i < len(raw_data):
         temp_row = raw_data[i].split(" ")  # Splits 'Outline NO_outline' where NO_outline is number of points in Outline
         if temp_row[0].lower() == 'outline': # makes string data lower case and checks if it is 'outline'
@@ -83,31 +84,49 @@ def data_extract(filename):
 
     return output_data
 
-def line_eq(px1,py1,px2,py2) :
+def line_eq(px1,py1,px2,py2) : # need a check to see if gradient is +- inf
     m = (py1-py2)/(px1-px2)
     c = py1-m*px1
     return m , c
 
+def point_in_poly(filename,lx1,ly1):
+    intersection_count = 0 # counter used for number of intersections from point ray cast
+    row_count = 0 # used to keep track of what rows of the text file has been extracted
+
+    file_data = data_extract(filename,row_count)
+    print(file_data)
+
+    if (intersection_count % 2 ) == 0 : # checks if number of intersections is even
+        in_poly = 'within' # if even point is point is outside polygon
+    else:
+        in_poly = 'outside'  # if odd point is point is inside polygon
+    return in_poly
 
 if __name__ == '__main__':
-
     ## <main.py> <text file> <x> <y>
-    # filename = sys.argv[1]
-    # x_point = int(sys.argv[2])
-    # y_point = int(sys.argv[3])
+    try:
+        filename = sys.argv[1]
+        lx1 = int(sys.argv[2]) # x point coordinate
+        ly1 = int(sys.argv[3]) # y point coordinate
 
+    except:
     ## uncomment for manual input
-    filename = 'data.txt'
-    x_point = 250
-    y_point = 500
+        filename = 'data.txt'
+        lx1 = 250 # x point coordinate
+        ly1 = 500 # y point coordinate
+        print('cmd line inputs not read successfully, using defaults which can be changed within file')
+
+    in_poly = point_in_poly(filename, lx1, ly1)
+
+    print('Point (' + str(lx1) + ',' + str(ly1) + ')' + ' found to be ' + in_poly +' polygon described in: ' + filename )
 
 
-    file_data = data_extract(filename)
-    print(file_data)
-    k = 1
-    m = line_eq(file_data[k,0] , file_data[k,1] , file_data[k+1,0] , file_data[k+1,1] )
-    print(m)
-    print(file_data[0,:])
+    # # to test data_extract and grad
+    # file_data = data_extract(filename)
+    # print(file_data)
+    # for k in range(len(file_data)-1):
+    #     mc = line_eq(file_data[k,0] , file_data[k,1] , file_data[k+1,0] , file_data[k+1,1] )
+    #     print(mc)
 
 
 
