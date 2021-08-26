@@ -9,3 +9,6 @@ nuance when point is between polygon coords
 
 
 could work out line equation and
+
+
+https://www.desmos.com/calculator/wxty2xhyou
