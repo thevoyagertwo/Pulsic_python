@@ -67,7 +67,7 @@ def mid_intersection(lx, ly, px1, py1, px2, py2):
     pxmax = max(px1, px2)
     py_at_xmax = round(m * pxmax + c)
 
-    y_bounds = ly < min(py_at_lx,py_at_xmax) and ly >= max(py_at_lx,py_at_xmax)
+    y_bounds = ly > min(py_at_lx,py_at_xmax) and ly <= max(py_at_lx,py_at_xmax)
 
     # checks these new bounds to see if point is actually intersecting polygon line
     if y_bounds:
