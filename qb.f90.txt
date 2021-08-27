@@ -1,4 +1,4 @@
-!!!!!!!!!!!!!!!!!!!!!!!!!!! module load openmpi
+! module load openmpi
 
 program qb
 use mpi
@@ -8,8 +8,6 @@ real,allocatable,dimension(:,:) :: p , q ! phi and charge size determined by h a
 integer :: x , y , k = 0 ,maxruns , nx , ny , NOdatapoints
 integer,dimension(1:2) :: arraySE !arrayStartEnd  used to store start and end values  stored in each proccesor x.e. the row index stored
 real :: w , eps , h , a , b , p_new
-
-!https://www.google.com/search?q=how+fortran+stores+matrices&client=ubuntu&hs=VuH&channel=fs&sxsrf=ACYBGNTSMIJ1hNJU0aJ-jeMRRo8U2lWMBA:1575722180192&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiCn8LGxqPmAhXhoXEKHYsbAAoQ_AUoAXoECA0QAw&biw=892&bih=746#imgrc=WMc9MY_2Ow3QDM
 
 !grayscale variables:
 real :: tmin, tmax

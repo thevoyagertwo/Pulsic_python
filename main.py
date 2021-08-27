@@ -59,7 +59,7 @@ def line_eq(px1, py1, px2, py2):
     return m, c
 
     # special case where between y bounds and x bounds of polygon line
-    # shouldn't have any divide by 0 issues as vertical lines should not lead to a mid_intersection
+    # shouldn't have any divide by 0 issues in line_eq as vertical lines should not lead to a mid_intersection
 def mid_intersection(lx, ly, px1, py1, px2, py2):
     m, c = line_eq(px1, py1, px2, py2)  # finds line of the equation
     py_at_xmin = round(m * lx + c)  # calculated polygon line y value at lx
