@@ -1,8 +1,8 @@
 # Written by Michael Lee contact: mgdlee98@gmail.com
 # Using Ray casting method to find if point is within a polygon
-# works by shooting out line from the point and counting intersections odd = in, even = out
-# ran with command line with : <main.py> <text file> <x> <y>
-# or my manually inputting values
+# works by shooting out line from the point and counting intersections odd count = in, even count = out
+# ran with command line with : Michael_Lee_Pulsic_Test.py <text file> <x> <y>
+# or my manually inputting values at bottom of file
 
 
 # Possible optimisations:
@@ -119,7 +119,7 @@ def point_in_poly(filename, lx, ly):  # lx,ly are point coordinates. Line(ray) d
 
 
 if __name__ == '__main__':
-    ## <main.py> <text file> <x> <y>
+    ## Michael_Lee_Pulsic_Test.py <text file> <x> <y>
     try:
         filename = sys.argv[1]
         lx = int(sys.argv[2])  # x point coordinate
